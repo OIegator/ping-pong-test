@@ -3,6 +3,14 @@ const context = canvas.getContext('2d')
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
 
+// class bonus() {
+//   x: (canvas.width / 2),
+//       y: 200,
+//       w: 50,
+//       vx: 5,
+//       vy: 5,
+// };
+
 const gameState = {
   STOPPED: false,
   player: {
@@ -12,8 +20,8 @@ const gameState = {
     r: 10,
     x: (canvas.width / 2),
     y: 100,
-    vx: Math.random() * 20 + -1,
-    vy: Math.random() * 20 + -1,
+    vx: 5,
+    vy: 5,
   },
   paddle: {
     w: 400,
@@ -61,12 +69,27 @@ function drawBall(ball) {
   context.fill();
 }
 
-function collisionCheck(pad, ball) {
+function drawBonus(bonus) {
+  context.beginPath();
+  context.fillStyle = "#569142";
+  context.lineWidth = bonus.w;
+  context.lineTo(bonus.x, bonus.y);
+  context.lineTo(bonus.x, bonus.y - bonus.w);
+  context.lineTo(bonus.x, bonus.y + bonus.w);
+  context.lineTo(bonus.x, bonus.y);
+  context.lineTo(bonus.x - bonus.w, bonus.y);
+  context.lineTo(bonus.x + bonus.w, bonus.y);
+  context.stroke();
+}
+
+
+function collisionCheck(pad, ball, bonus) {
   const paddleCenter = {
     x: (pad.x + pad.w) / 2,
     y: (pad.y + pad.h) / 2
   };
-  if (ball.y + ball.r + ball.r >= (pad.y)) {
+
+  if (ball.y + ball.r + ball.r >= (pad.y) && ball.vy > 0) {
     if ((ball.x + ball.r <= pad.x + pad.w || ball.x - ball.r <= pad.x + pad.w) && (ball.x + ball.r >= pad.x || ball.x - ball.r >= pad.x)) {
       ball.vy = -1 * ball.vy;
       if (ball.x - ball.r < paddleCenter.x) {
@@ -76,6 +99,20 @@ function collisionCheck(pad, ball) {
       ball.vy += 1;
       if (!gameState.STOPPED)
         gameState.player.score += 1;
+    }
+  }
+
+  if (bonus.y + bonus.w  >= (pad.y) && bonus.vy > 0) {
+    if ((bonus.x + bonus.w <= pad.x + pad.w || bonus.x - bonus.w  <= pad.x + pad.w) &&
+        (bonus.x + bonus.w  >= pad.x || bonus.x - bonus.w >= pad.x)) {
+      bonus.vy = -1 * bonus.vy;
+      if (bonus.x - bonus.w < paddleCenter.x) {
+        bonus.vx = -1 * bonus.vx;
+      }
+      bonus.vx += 1;
+      bonus.vy += 1;
+      if (!gameState.STOPPED)
+        gameState.player.score += 60;
     }
   }
 }
@@ -102,7 +139,27 @@ function draw() {
   drawScore();
 }
 
+const BONUS_TIMER = 3;
+let timePassed = 0;
+let timeLeft = BONUS_TIMER;
+let interval = 0;
 function update(ball) {
+
+  timePassed += 0.0167;
+  timeLeft = BONUS_TIMER - timePassed;
+  console.log(timeLeft);
+  interval += 0.0167
+  if(interval > 1) {
+    interval = 0;
+    gameState.player.score += 1;
+  }
+
+  if (Math.floor(timeLeft) === 0) {
+    timeLeft = BONUS_TIMER;
+    timePassed = 0;
+    onTimesUp();
+  }
+
   ball.x += ball.vx;
   ball.y += ball.vy;
   if (ball.y > canvas.height) {
@@ -116,8 +173,12 @@ function update(ball) {
     ball.vx = -1 * ball.vx;
   }
 
-  collisionCheck(gameState.paddle, gameState.ball);
+  collisionCheck(gameState.paddle, gameState.ball, gameState.bonus);
 }
 
+function onTimesUp() {
+  console.log("30s");
+  //drawBonus(gameState.bonus);
+}
 
 run();
