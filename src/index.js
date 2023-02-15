@@ -3,14 +3,6 @@ const context = canvas.getContext('2d')
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
 
-// class bonus() {
-//   x: (canvas.width / 2),
-//       y: 200,
-//       w: 50,
-//       vx: 5,
-//       vy: 5,
-// };
-
 const gameState = {
   STOPPED: false,
   player: {
@@ -29,6 +21,14 @@ const gameState = {
     x: (canvas.width / 2 - 200),
     y: (canvas.height - 60),
   },
+  bonus: {
+    isOn: false,
+    x: (canvas.width / 2),
+    y: 200,
+    w: 20,
+    vx: 15,
+    vy: 3,
+  },
 }
 
 //TODO: subscribe on window resize
@@ -44,7 +44,7 @@ function run() {
 
 function gameLoop() {
   draw()
-  update(gameState.ball)
+  update(gameState.ball, gameState.bonus)
 }
 
 function drawPaddle(pad) {
@@ -69,10 +69,11 @@ function drawBall(ball) {
   context.fill();
 }
 
-function drawBonus(bonus) {
+function drawBonus(bns) {
+  const bonus = {x: bns.x, y: bns.y, w: bns.w, vx: bns.vx, vy: bns.vy}
   context.beginPath();
-  context.fillStyle = "#569142";
-  context.lineWidth = bonus.w;
+  context.strokeStyle = "#569142";
+  context.lineWidth = 5;
   context.lineTo(bonus.x, bonus.y);
   context.lineTo(bonus.x, bonus.y - bonus.w);
   context.lineTo(bonus.x, bonus.y + bonus.w);
@@ -80,8 +81,8 @@ function drawBonus(bonus) {
   context.lineTo(bonus.x - bonus.w, bonus.y);
   context.lineTo(bonus.x + bonus.w, bonus.y);
   context.stroke();
+  context.beginPath();
 }
-
 
 function collisionCheck(pad, ball, bonus) {
   const paddleCenter = {
@@ -97,22 +98,22 @@ function collisionCheck(pad, ball, bonus) {
       }
       ball.vx += 1;
       ball.vy += 1;
-      if (!gameState.STOPPED)
-        gameState.player.score += 1;
+
     }
   }
 
   if (bonus.y + bonus.w  >= (pad.y) && bonus.vy > 0) {
     if ((bonus.x + bonus.w <= pad.x + pad.w || bonus.x - bonus.w  <= pad.x + pad.w) &&
         (bonus.x + bonus.w  >= pad.x || bonus.x - bonus.w >= pad.x)) {
-      bonus.vy = -1 * bonus.vy;
-      if (bonus.x - bonus.w < paddleCenter.x) {
-        bonus.vx = -1 * bonus.vx;
-      }
-      bonus.vx += 1;
-      bonus.vy += 1;
-      if (!gameState.STOPPED)
+
+      if (!gameState.STOPPED && gameState.bonus.isOn) {
         gameState.player.score += 60;
+        gameState.bonus.isOn = false;
+        gameState.bonus.x = (canvas.width / 2);
+        gameState.bonus.y = 20;
+        gameState.bonus.vx = 15;
+        gameState.bonus.vy = 3;
+      }
     }
   }
 }
@@ -136,28 +137,53 @@ function draw() {
   context.clearRect(0, 0, canvas.width, canvas.height);
   drawBall(gameState.ball);
   drawPaddle(gameState.paddle);
+  if(gameState.bonus.isOn) {
+    drawBonus(gameState.bonus);
+  };
   drawScore();
 }
 
-const BONUS_TIMER = 3;
-let timePassed = 0;
-let timeLeft = BONUS_TIMER;
+const BONUS_TIMER = 15;
+const VELOCITY_TIMER = 30;
+let timePassedSinceBonus = 0;
+let timePassedSinceVelocity = 0;
+let timeLeftToBonus = BONUS_TIMER;
+let timeLeftToSpeedUp = VELOCITY_TIMER;
 let interval = 0;
-function update(ball) {
 
-  timePassed += 0.0167;
-  timeLeft = BONUS_TIMER - timePassed;
-  console.log(timeLeft);
+function onTimesUpVelocity() {
+  gameState.ball.vx = gameState.ball.vx * 1.2;
+  gameState.ball.vy = gameState.ball.vy * 1.2;
+}
+
+function onTimesUpBonus() {
+  gameState.bonus.isOn = true;
+}
+
+function update(ball, bonus) {
+
+  timePassedSinceBonus += 0.0167;
+  timeLeftToBonus = BONUS_TIMER - timePassedSinceBonus;
+
   interval += 0.0167
-  if(interval > 1) {
+  if(interval > 1 && !gameState.STOPPED) {
     interval = 0;
     gameState.player.score += 1;
   }
 
-  if (Math.floor(timeLeft) === 0) {
-    timeLeft = BONUS_TIMER;
-    timePassed = 0;
-    onTimesUp();
+  timePassedSinceVelocity += 0.0167;
+  timeLeftToSpeedUp = VELOCITY_TIMER - timePassedSinceVelocity;
+
+  if (Math.floor(timeLeftToSpeedUp) === 0) {
+    timeLeftToSpeedUp = VELOCITY_TIMER;
+    timePassedSinceVelocity = 0;
+    onTimesUpVelocity();
+  }
+
+  if (Math.floor(timeLeftToBonus) === 0) {
+    timeLeftToBonus = BONUS_TIMER;
+    timePassedSinceBonus = 0;
+    onTimesUpBonus();
   }
 
   ball.x += ball.vx;
@@ -169,16 +195,32 @@ function update(ball) {
   if (ball.y < ball.r) {
     ball.vy = -1 * ball.vy;
   }
-  if (ball.x > canvas.width - ball.r || ball.x < 0 + ball.r) {
+  if (ball.x > canvas.width - ball.r || ball.x < ball.r) {
     ball.vx = -1 * ball.vx;
   }
 
-  collisionCheck(gameState.paddle, gameState.ball, gameState.bonus);
-}
+  if (gameState.bonus.isOn) {
+    bonus.x += bonus.vx;
+    bonus.y += bonus.vy;
+    if (bonus.y > canvas.height) {
+      if (!gameState.STOPPED && gameState.bonus.isOn) {
+        gameState.bonus.isOn = false;
+        gameState.bonus.x = (canvas.width / 2);
+        gameState.bonus.y = 20;
+        gameState.bonus.vx = 15;
+        gameState.bonus.vy = 3;
+      }
+      return;
+    }
+    if (bonus.y < bonus.w) {
+      bonus.vy = -1 * bonus.vy;
+    }
+    if (bonus.x > canvas.width - bonus.w || bonus.x < bonus.w) {
+      bonus.vx = -1 * bonus.vx;
+    }
+  }
 
-function onTimesUp() {
-  console.log("30s");
-  //drawBonus(gameState.bonus);
+  collisionCheck(gameState.paddle, gameState.ball, gameState.bonus);
 }
 
 run();
